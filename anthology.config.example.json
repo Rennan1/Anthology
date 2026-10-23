@@ -1,0 +1,78 @@
+{
+  "$schema": "./anthology.config.schema.json",
+  "version": 1,
+  "server": {
+    "port": 8080,
+    "bodyLimit": "10mb",
+    "shutdownGraceMs": 30000
+  },
+  "logging": {
+    "level": "info",
+    "includeContent": false
+  },
+  "auth": {
+    "keys": [
+      { "id": "app-backoffice", "keyEnv": "ANTHOLOGY_KEY_BACKOFFICE", "routes": ["*"] },
+      { "id": "app-chatbot", "keyEnv": "ANTHOLOGY_KEY_CHATBOT", "routes": ["general", "summarize"] }
+    ]
+  },
+  "providers": {
+    "openrouter": {
+      "type": "openrouter",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "baseURL": "https://openrouter.ai/api/v1",
+      "headers": { "HTTP-Referer": "https://anthology.interno", "X-Title": "Anthology" }
+    }
+  },
+  "models": {
+    "sonnet": {
+      "provider": "openrouter",
+      "modelId": "anthropic/claude-sonnet-4.5",
+      "capabilities": ["tools", "vision", "json_schema"],
+      "contextWindow": 200000,
+      "maxOutputTokens": 16000,
+      "timeoutMs": 120000,
+      "maxRetries": 1,
+      "defaults": { "temperature": 0.2 },
+      "providerOptions": {}
+    },
+    "flash": {
+      "provider": "openrouter",
+      "modelId": "google/gemini-2.5-flash",
+      "capabilities": ["tools", "vision", "json_schema"],
+      "timeoutMs": 60000
+    },
+    "mini": {
+      "provider": "openrouter",
+      "modelId": "openai/gpt-5-mini",
+      "capabilities": ["tools", "json_schema"]
+    }
+  },
+  "orchestrator": {
+    "model": "flash",
+    "fallbacks": ["mini"],
+    "defaultRoute": "general",
+    "timeoutMs": 5000,
+    "instructions": "Na dúvida entre duas Rotas, prefira a de menor custo.",
+    "context": { "maxMessages": 6, "maxCharsPerMessage": 2000, "maxChars": 8000 }
+  },
+  "routes": {
+    "code": {
+      "description": "Escrever, revisar, depurar ou explicar código e SQL",
+      "target": "sonnet",
+      "fallbacks": ["mini"]
+    },
+    "summarize": {
+      "description": "Resumir ou condensar textos longos e documentos",
+      "target": "flash",
+      "fallbacks": ["mini"],
+      "defaults": { "temperature": 0 }
+    },
+    "general": {
+      "description": "Conversa geral e qualquer tarefa que não se encaixe nas outras Rotas",
+      "target": "mini",
+      "fallbacks": ["flash"],
+      "enforce": { "maxOutputTokens": 4000 }
+    }
+  }
+}
