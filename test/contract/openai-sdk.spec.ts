@@ -218,3 +218,29 @@ describe("x-request-id também nos erros do body-parser", () => {
     expect(res.headers.get("x-request-id")).toBe("rid-1");
   });
 });
+
+describe("abort do cliente", () => {
+  it("cliente que desconecta aborta o sinal entregue ao roteamento", async () => {
+    router.reply();
+    router.holdUntilAborted = true;
+    try {
+      const controller = new AbortController();
+      const pending = fetch(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${VALID_KEY}`, "content-type": "application/json" },
+        body: JSON.stringify({ model: "code", messages: hello }),
+        signal: controller.signal,
+      }).catch((e: unknown) => e);
+      while (router.lastSignal === undefined) await new Promise((r) => setTimeout(r, 5));
+      expect(router.lastSignal.aborted).toBe(false);
+      controller.abort();
+      await pending;
+      for (let i = 0; i < 200 && !router.lastSignal.aborted; i++) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      expect(router.lastSignal.aborted).toBe(true);
+    } finally {
+      router.holdUntilAborted = false;
+    }
+  });
+});

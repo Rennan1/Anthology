@@ -46,10 +46,24 @@ export class ScriptedRouter implements ChatRouter {
   reply(...script: (GatewayResult | GatewayError)[]): void {
     this.script = [...script];
     this.received.length = 0;
+    this.lastSignal = undefined;
   }
 
-  async complete(request: GatewayRequest, _caller: GatewayCaller): Promise<GatewayResult> {
+  /** Sinal recebido na última chamada e quando `holdUntilAborted` está ligado, trava até ele abortar. */
+  lastSignal: AbortSignal | undefined;
+  holdUntilAborted = false;
+
+  async complete(
+    request: GatewayRequest,
+    _caller: GatewayCaller,
+    signal: AbortSignal,
+  ): Promise<GatewayResult> {
     this.received.push(request);
+    this.lastSignal = signal;
+    if (this.holdUntilAborted) {
+      await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve()));
+      throw new GatewayError("upstream_unavailable", "aborted");
+    }
     const next = this.script.shift();
     if (next === undefined) throw new Error("script esgotado");
     if (next instanceof GatewayError) throw next;
