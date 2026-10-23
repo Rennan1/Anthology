@@ -17,6 +17,10 @@ export interface RoutingCompletedEvent {
   readonly routedBy: RoutedBy;
   readonly attempts: readonly AttemptRecord[];
   readonly skipped: readonly SkippedCandidate[];
+  /** Request parameters no candidate honored (SPEC-005), e.g. `parallel_tool_calls`. */
+  readonly ignoredParams?: readonly string[];
+  readonly usageMissing?: true;
+  readonly finishReasonRaw?: string;
 }
 
 export interface RoutingRecorder {

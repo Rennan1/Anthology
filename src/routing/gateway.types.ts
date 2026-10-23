@@ -1,3 +1,5 @@
+import type { ModelMessage, ToolChoice, ToolSet } from "ai";
+
 /** Id reservado: entrega a escolha da Rota ao orquestrador (SPEC-009). */
 export const AUTO_MODEL_ID = "auto";
 
@@ -26,20 +28,30 @@ export interface GenerationParams {
   readonly maxOutputTokens?: number;
 }
 
+/** Saída estruturada pedida (SPEC-005); o roteamento a converte para a chamada do AI SDK. */
+export type GatewayResponseFormat =
+  | { readonly type: "json_object" }
+  | {
+      readonly type: "json_schema";
+      readonly name: string;
+      readonly description?: string;
+      readonly schema: Readonly<Record<string, unknown>>;
+    };
+
 /**
- * Requisição já validada e livre de formato OpenAI. `messages`, `tools`, `toolChoice` e
- * `responseFormat` seguem como vieram: a tradução para o AI SDK é da SPEC-005.
+ * Requisição já validada, livre de formato OpenAI e já traduzida para o AI SDK (SPEC-005):
+ * `openai-compat/translate` produz `messages`, `tools` e `toolChoice`; o roteamento só os repassa.
  */
 export interface GatewayRequest {
   readonly model: string;
   /** Rota devolvida pelo cliente em `x-anthology-route` (continuação, SPEC-009). */
   readonly continuationRoute: string | undefined;
-  readonly messages: readonly unknown[];
+  readonly messages: readonly ModelMessage[];
   readonly params: GenerationParams;
-  readonly tools: readonly unknown[] | undefined;
-  readonly toolChoice: unknown;
+  readonly tools: ToolSet | undefined;
+  readonly toolChoice: ToolChoice<ToolSet> | undefined;
   readonly parallelToolCalls: boolean | undefined;
-  readonly responseFormat: unknown;
+  readonly responseFormat: GatewayResponseFormat | undefined;
   readonly endUser: string | undefined;
 }
 
@@ -53,6 +65,10 @@ export interface GatewayUsage {
   readonly promptTokens: number;
   readonly completionTokens: number;
   readonly totalTokens: number;
+  /** Cached input tokens, when the provider says (SPEC-005). */
+  readonly cachedPromptTokens?: number;
+  /** Reasoning output tokens, when the provider says (SPEC-005). */
+  readonly reasoningTokens?: number;
 }
 
 export interface GatewayResult {
@@ -66,6 +82,10 @@ export interface GatewayResult {
   /** Id, na configuração, do Modelo que atendeu (o do fallback quando o primário falhou). */
   readonly modelKey: string;
   readonly attempts: number;
+  /** The provider sent no usage at all: the zeros in `usage` are not a measurement (SPEC-005). */
+  readonly usageMissing?: true;
+  /** The provider's own finish reason, kept for the log when the mapping loses it (SPEC-005). */
+  readonly finishReasonRaw?: string;
 }
 
 /** Porta do roteamento (SPEC-003/009); implementada no marco do roteamento. */

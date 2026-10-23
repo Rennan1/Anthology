@@ -123,6 +123,32 @@ Testes unitários puros (sem rede) para cada linha das tabelas. Em destaque:
 6. Teste de contrato (SPEC-001, critério 1) com o SDK `openai` cobre o ciclo de tool call ponta a
    ponta.
 
+## Notas de implementação
+
+Confirmadas contra `ai@7.0.150` e `@openrouter/ai-sdk-provider@3.1.0` instalados:
+
+- **Q-07 (saída estruturada):** o `Output.object` do AI SDK faz parse e validação **antes** de
+  devolver e lança `NoObjectGeneratedError` em JSON inválido ou truncado (um `finish_reason: length`
+  viraria 502). O gateway usa um `Output` próprio (`routing/raw-json-output.ts`) que só define o
+  `responseFormat` (`{ type: "json" }`, com `schema`, `name` e `description` no `json_schema`) e
+  devolve o texto cru. Assim vale o que a spec promete: o JSON sai como string, sem validação.
+- `strict: true` da função vai para `tool({ strict: true })`, a flag nativa do AI SDK; o provedor que
+  a suporta a usa, os demais a ignoram. Não passa por `providerOptions`.
+- `parallel_tool_calls`: o pacote do OpenRouter espalha `providerOptions.openrouter` no corpo, então
+  a fábrica declara `parallelToolCallsOption: "parallel_tool_calls"` e o campo vai para
+  `providerOptions.openrouter.parallel_tool_calls`. Fábrica sem a declaração: o parâmetro é ignorado
+  e o evento `routing.completed` traz `ignoredParams: ["parallel_tool_calls"]`.
+- O `finishReason` do AI SDK 7 ganhou `interrupted`; ele vira `other` (e `stop` na resposta), com o
+  valor do provedor em `finishReasonRaw` no log, como `error` e `other`. `unknown` não existe mais
+  no SDK; a linha da tabela fica por segurança.
+- `usage`: `usage.inputTokenDetails.cacheReadTokens` e `outputTokenDetails.reasoningTokens` viram
+  `prompt_tokens_details.cached_tokens` e `completion_tokens_details.reasoning_tokens`, só quando o
+  provedor informa. Sem nenhum token, os campos saem `0` e o log marca `usageMissing`.
+- Argumentos de tool vazios (`""`) viram `{}`; `data:` URL aceita só `image/*`; só `http`, `https` e
+  `data` valem para imagem (qualquer outro esquema deixaria o provedor ler dado local).
+- Mensagem `assistant` sem a chave `content` (o SDK Python manda assim com
+  `model_dump(exclude_none=True)`) é válida quando há `tool_calls`.
+
 ## Fora de escopo (v1)
 
 Execução de tools no gateway, MCP, áudio, arquivos (`file`), exposição de reasoning, validação do

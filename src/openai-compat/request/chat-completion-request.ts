@@ -1,6 +1,10 @@
 import { z } from "zod";
+import { formatJsonPath } from "../../common/json-path.js";
 import type { GatewayRequest, GenerationParams } from "../../routing/gateway.types.js";
 import { GatewayError } from "../../routing/gateway-error.js";
+import { translateMessages } from "../translate/messages.js";
+import { translateResponseFormat } from "../translate/response-format.js";
+import { translateTools } from "../translate/tools.js";
 
 export interface ParsedChatCompletion {
   readonly request: GatewayRequest;
@@ -85,20 +89,6 @@ function rejectUnsupported(body: Record<string, unknown>): void {
   }
 }
 
-/** OpenAI-style path: `["messages", 2, "role"]` becomes `messages[2].role`. */
-function formatPath(path: readonly PropertyKey[]): string | undefined {
-  if (path.length === 0) return undefined;
-  return path.reduce<string>(
-    (acc, key) =>
-      typeof key === "number"
-        ? `${acc}[${key}]`
-        : acc === ""
-          ? String(key)
-          : `${acc}.${String(key)}`,
-    "",
-  );
-}
-
 export function parseChatCompletionRequest(
   body: unknown,
   continuationRoute: string | undefined,
@@ -108,20 +98,22 @@ export function parseChatCompletionRequest(
   if (!result.success) {
     const issue = result.error.issues[0];
     throw new GatewayError("invalid_request", issue?.message ?? "Invalid request body", {
-      param: formatPath(issue?.path ?? []),
+      param: formatJsonPath(issue?.path ?? []) || undefined,
     });
   }
   const parsed = result.data;
+  // SPEC-005: from here on the request is in AI SDK terms; shape errors surface as 400 with a path.
+  const { tools, toolChoice } = translateTools(parsed.tools, parsed.tool_choice);
   return {
     request: {
       model: parsed.model,
       continuationRoute,
-      messages: parsed.messages,
+      messages: translateMessages(parsed.messages),
       params: toParams(parsed),
-      tools: parsed.tools ?? undefined,
-      toolChoice: parsed.tool_choice ?? undefined,
+      tools,
+      toolChoice,
       parallelToolCalls: parsed.parallel_tool_calls ?? undefined,
-      responseFormat: parsed.response_format ?? undefined,
+      responseFormat: translateResponseFormat(parsed.response_format),
       endUser: parsed.user ?? undefined,
     },
     stream: parsed.stream ?? false,

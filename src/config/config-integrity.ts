@@ -1,7 +1,7 @@
+import { formatJsonPath } from "../common/json-path.js";
 import { AUTO_MODEL_ID } from "../routing/gateway.types.js";
 import type { ConfigIssue } from "./config-error.js";
 import type { ConfigFile } from "./config-schema.js";
-import { formatJsonPath } from "./json-path.js";
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const SECRET_LIKE = [/^sk-/, /^Bearer /, /[A-Za-z0-9+/]{32,}/];

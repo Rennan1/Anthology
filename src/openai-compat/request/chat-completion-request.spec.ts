@@ -56,6 +56,35 @@ describe("parseChatCompletionRequest", () => {
     });
   });
 
+  describe("translation errors (SPEC-005) surface as 400 with the field path", () => {
+    it("rejects a malformed message", () => {
+      const err = errorOf({ model: "code", messages: [{ role: "user", content: 42 }] });
+
+      expect(err).toMatchObject({ code: "invalid_request", param: "messages[0].content" });
+    });
+
+    it("rejects a tool message with no matching call", () => {
+      const err = errorOf({
+        model: "code",
+        messages: [{ role: "tool", tool_call_id: "x", content: "ok" }],
+      });
+
+      expect(err).toMatchObject({ code: "invalid_request", param: "messages[0].tool_call_id" });
+    });
+
+    it("rejects a non-function tool", () => {
+      const err = errorOf({ ...minimal, tools: [{ type: "custom" }] });
+
+      expect(err).toMatchObject({ code: "unsupported_parameter", param: "tools[0].type" });
+    });
+
+    it("rejects a response_format json_schema without its schema object", () => {
+      const err = errorOf({ ...minimal, response_format: { type: "json_schema" } });
+
+      expect(err).toMatchObject({ code: "invalid_request", param: "response_format.json_schema" });
+    });
+  });
+
   describe("unsupported_parameter", () => {
     it.each([
       ["n", 2],
@@ -150,7 +179,7 @@ describe("parseChatCompletionRequest", () => {
       expect(many.request.params.stop).toEqual(["a", "b"]);
     });
 
-    it("forwards tools, tool_choice, parallel_tool_calls, response_format and user untranslated", () => {
+    it("translates tools, tool_choice and response_format (SPEC-005) and forwards the rest", () => {
       const tools = [{ type: "function", function: { name: "f", parameters: {} } }];
       const responseFormat = { type: "json_object" };
       const { request } = parseChatCompletionRequest(
@@ -165,10 +194,10 @@ describe("parseChatCompletionRequest", () => {
         undefined,
       );
 
-      expect(request.tools).toEqual(tools);
+      expect(Object.keys(request.tools ?? {})).toEqual(["f"]);
       expect(request.toolChoice).toBe("auto");
       expect(request.parallelToolCalls).toBe(false);
-      expect(request.responseFormat).toEqual(responseFormat);
+      expect(request.responseFormat).toEqual({ type: "json_object" });
       expect(request.endUser).toBe("u-1");
     });
 

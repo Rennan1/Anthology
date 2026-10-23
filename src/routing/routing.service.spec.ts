@@ -1,6 +1,7 @@
 import type { MockLanguageModelV4 } from "ai/test";
 import { mockCatalog } from "../../test/support/catalog.js";
 import { type ConfigJson, testConfig } from "../../test/support/config-fixture.js";
+import { imageMessage, weatherTools } from "../../test/support/requests.js";
 import {
   HANG,
   httpError,
@@ -45,6 +46,7 @@ interface Setup {
 function setup(
   models: Partial<Record<"sonnet" | "flash" | "mini", MockLanguageModelV4>>,
   change?: Parameters<typeof testConfig>[0],
+  catalogOptions?: Parameters<typeof mockCatalog>[2],
 ): Setup {
   const config = testConfig(change);
   const all = {
@@ -54,7 +56,7 @@ function setup(
     ...models,
   };
   const recorder = new CapturingRecorder();
-  const service = new RoutingService(config, mockCatalog(config, all), recorder);
+  const service = new RoutingService(config, mockCatalog(config, all, catalogOptions), recorder);
   return { service, recorder, models: all };
 }
 
@@ -262,7 +264,7 @@ describe("RoutingService.complete: capabilities (criteria 4 and 5)", () => {
       c.models.sonnet.capabilities = ["vision"];
     });
 
-    const result = await run(s, request({ tools: [{ type: "function" }] }));
+    const result = await run(s, request({ tools: weatherTools }));
 
     expect(result).toMatchObject({ modelKey: "mini", attempts: 1 });
     expect(calls(s.models.sonnet)).toBe(0);
@@ -275,9 +277,8 @@ describe("RoutingService.complete: capabilities (criteria 4 and 5)", () => {
     const s = setup({}, (c) => {
       c.models.flash.capabilities = ["tools", "json_schema"];
     });
-    const image = { role: "user", content: [{ type: "image", image: "x" }] };
 
-    const err = await errorOf(run(s, request({ model: "general", messages: [image] })));
+    const err = await errorOf(run(s, request({ model: "general", messages: [imageMessage] })));
 
     expect(err.code).toBe("unsupported_capability");
     for (const model of Object.values(s.models)) expect(calls(model)).toBe(0);
@@ -343,5 +344,157 @@ describe("RoutingService.complete: what reaches the model (criteria 8 and 9)", (
     abort.abort();
 
     expect(s.models.sonnet?.doGenerateCalls[0]?.abortSignal?.aborted).toBe(true);
+  });
+});
+
+describe("RoutingService.complete: SPEC-005 (tools, structured output, usage)", () => {
+  it("hands the AI SDK the tools and the tool choice, and a tool-calls finish comes back", async () => {
+    const s = setup({ sonnet: scriptedModel(toolCallReply("c1", "get_weather", { city: "SP" })) });
+
+    const result = await run(
+      s,
+      request({ tools: weatherTools, toolChoice: { type: "tool", toolName: "get_weather" } }),
+    );
+
+    const call = s.models.sonnet?.doGenerateCalls[0];
+    expect(call?.tools?.map((t) => (t.type === "function" ? t.name : t.type))).toEqual([
+      "get_weather",
+    ]);
+    expect(call?.toolChoice).toEqual({ type: "tool", toolName: "get_weather" });
+    expect(result.toolCalls).toEqual([{ id: "c1", name: "get_weather", input: { city: "SP" } }]);
+  });
+
+  it("asks for json_schema output with the schema and name, and returns the text untouched", async () => {
+    const schema = { type: "object", properties: { n: { type: "number" } } };
+    const s = setup({ sonnet: scriptedModel(textReply('{"n":1}')) });
+
+    const result = await run(
+      s,
+      request({ responseFormat: { type: "json_schema", name: "r", description: "d", schema } }),
+    );
+
+    expect(s.models.sonnet?.doGenerateCalls[0]?.responseFormat).toEqual({
+      type: "json",
+      schema,
+      name: "r",
+      description: "d",
+    });
+    expect(result.text).toBe('{"n":1}');
+  });
+
+  it("asks for free JSON on json_object, and sends no response format otherwise", async () => {
+    const json = setup({ sonnet: scriptedModel(textReply("{}")) });
+    const plain = setup({ sonnet: scriptedModel(textReply("x")) });
+
+    await run(json, request({ responseFormat: { type: "json_object" } }));
+    await run(plain);
+
+    expect(json.models.sonnet?.doGenerateCalls[0]?.responseFormat).toEqual({ type: "json" });
+    expect(plain.models.sonnet?.doGenerateCalls[0]?.responseFormat).toBeUndefined();
+  });
+
+  it("does not validate the generated JSON: a truncated answer comes back with finish length", async () => {
+    const s = setup({ sonnet: scriptedModel(textReply('{"n":', "length")) });
+
+    const result = await run(
+      s,
+      request({ responseFormat: { type: "json_schema", name: "r", schema: {} } }),
+    );
+
+    expect(result).toMatchObject({ text: '{"n":', finishReason: "length" });
+  });
+
+  it("puts parallel_tool_calls under the provider namespace when the factory declares the switch", async () => {
+    const s = setup(
+      { sonnet: scriptedModel(textReply("ok")) },
+      (c) => {
+        c.models.sonnet.providerOptions = { provider: { order: ["anthropic"] } };
+      },
+      { parallelToolCallsOption: "parallel_tool_calls" },
+    );
+
+    await run(s, request({ parallelToolCalls: false }));
+
+    expect(s.models.sonnet?.doGenerateCalls[0]?.providerOptions).toEqual({
+      openrouter: { provider: { order: ["anthropic"] }, parallel_tool_calls: false },
+    });
+    expect(s.recorder.events[0]?.ignoredParams).toBeUndefined();
+  });
+
+  it("ignores parallel_tool_calls when the factory has no such switch, and logs it", async () => {
+    const s = setup({ sonnet: scriptedModel(textReply("ok")) });
+
+    await run(s, request({ parallelToolCalls: true }));
+
+    const sent = s.models.sonnet?.doGenerateCalls[0]?.providerOptions?.openrouter;
+    expect(sent).not.toHaveProperty("parallel_tool_calls");
+    expect(s.recorder.events[0]?.ignoredParams).toEqual(["parallel_tool_calls"]);
+  });
+
+  it("does nothing about parallel_tool_calls when the client did not send it", async () => {
+    const s = setup({ sonnet: scriptedModel(textReply("ok")) }, undefined, {
+      parallelToolCallsOption: "parallel_tool_calls",
+    });
+
+    await run(s);
+
+    const sent = s.models.sonnet?.doGenerateCalls[0]?.providerOptions?.openrouter;
+    expect(sent).not.toHaveProperty("parallel_tool_calls");
+    expect(s.recorder.events[0]?.ignoredParams).toBeUndefined();
+  });
+
+  it("reports cached and reasoning tokens when the provider gives them", async () => {
+    const detailed = {
+      ...textReply("ok"),
+      usage: {
+        inputTokens: { total: 100, noCache: 60, cacheRead: 40, cacheWrite: undefined },
+        outputTokens: { total: 30, text: 20, reasoning: 10 },
+      },
+    };
+    const s = setup({ sonnet: scriptedModel(detailed) });
+
+    const result = await run(s);
+
+    expect(result.usage).toEqual({
+      promptTokens: 100,
+      completionTokens: 30,
+      totalTokens: 130,
+      cachedPromptTokens: 40,
+      reasoningTokens: 10,
+    });
+    expect(result.usageMissing).toBeUndefined();
+  });
+
+  it("flags usageMissing when the provider sent no usage at all", async () => {
+    const none = {
+      ...textReply("ok"),
+      usage: {
+        inputTokens: {
+          total: undefined,
+          noCache: undefined,
+          cacheRead: undefined,
+          cacheWrite: undefined,
+        },
+        outputTokens: { total: undefined, text: undefined, reasoning: undefined },
+      },
+    };
+    const s = setup({ sonnet: scriptedModel(none) });
+
+    const result = await run(s);
+
+    expect(result).toMatchObject({ usageMissing: true, usage: { totalTokens: 0 } });
+  });
+
+  it("keeps the provider's own finish reason when it maps to something else", async () => {
+    const s = setup({
+      sonnet: scriptedModel({
+        ...textReply("x"),
+        finishReason: { unified: "other", raw: "weird_stop" },
+      }),
+    });
+
+    const result = await run(s);
+
+    expect(result).toMatchObject({ finishReason: "other", finishReasonRaw: "weird_stop" });
   });
 });
