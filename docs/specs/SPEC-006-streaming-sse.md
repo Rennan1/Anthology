@@ -92,6 +92,31 @@ O stream é encerrado **sem** `[DONE]`, para o cliente distinguir fim normal de 
 (`abortSignal`). A chamada upstream é cancelada, nenhum fallback é tentado e o log registra
 `outcome: "client_aborted"` com os tokens até ali, se o provedor os informar.
 
+## Notas de implementação
+
+Confirmadas contra `ai@7.0.150` instalado (`.d.ts` e fontes de `stream-text.ts`):
+
+- Nomes das partes de `fullStream` na v7: `text-delta` traz o texto em **`text`** (não `delta`);
+  `tool-input-delta` traz `delta`; `finish` traz `finishReason`, `rawFinishReason` e `totalUsage`.
+  Existe também a parte `abort`.
+- **Ponto de commit:** o SDK emite `start` na hora em que o stream nasce, antes de falar com o
+  provedor, então `start` **não** é o commit. O commit é a primeira parte depois dele
+  (`start-step` sai com o primeiro chunk real do provedor). Falha de chamada vira parte `error`
+  (não exceção), e uma chamada abortada (timeout do candidato ou cliente) termina com `abort`: antes
+  do commit as duas são falha do candidato.
+- O `timeoutMs` do candidato, em stream, vale **até o commit**: depois dele, uma resposta longa não
+  é cortada. Por isso o timer é um `setTimeout` cancelado no commit, e não um `AbortSignal.timeout`
+  (que não se cancela); o abort do cliente segue valendo o tempo todo.
+- `ChatRouter.stream` resolve no commit com `route`, `routedBy`, `modelKey`, `attempts` (os headers
+  `x-anthology-*` saem com o status 200) e as partes do stream; o evento `routing.completed` sai
+  quando o stream termina, com o desfecho do candidato commitado (`ok`, `stream_error` ou
+  `client_aborted`).
+- O controller escreve na resposta à mão (`@Res()` sem `passthrough`): depois do handler o Nest
+  chama `response.send()`, que falha numa resposta SSE já encerrada. Erro antes do primeiro byte
+  continua indo ao filtro de exceção, em JSON.
+- Stream que termina sem a parte `finish` é tratado como interrupção (evento de erro, sem `[DONE]`).
+- O texto do evento de erro é o da spec (em português) e não carrega nada do erro do provedor.
+
 ## Critérios de aceite
 
 Com mock de stream roteirizado:

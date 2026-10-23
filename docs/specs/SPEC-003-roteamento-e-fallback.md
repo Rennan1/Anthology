@@ -163,8 +163,9 @@ Confirmadas contra o `ai@7.0.150` instalado (`.d.ts` e fontes em `node_modules/a
 - `model: "auto"`: a continuação, a opção única e a `defaultRoute` já funcionam; a escolha pelo
   modelo orquestrador entra com a [SPEC-009](SPEC-009-orquestrador.md). Até lá, `auto` sem
   continuação com mais de uma Rota elegível cai na `defaultRoute` (`routed-by: default`).
-- Os critérios 6 e 7 (ponto de commit em streaming) e o `maxRetries` em stream pertencem à
-  [SPEC-006](SPEC-006-streaming-sse.md) e são cobertos lá.
+- Os critérios 6 e 7 (ponto de commit em streaming) são cobertos junto da
+  [SPEC-006](SPEC-006-streaming-sse.md): `RoutingService.stream` usa a mesma cadeia e a mesma
+  classificação, e o commit é a primeira parte do stream depois do `start` do SDK.
 
 ## Fora de escopo (v1)
 

@@ -17,6 +17,7 @@ import {
   type GatewayCaller,
   type GatewayRequest,
   type GatewayResult,
+  type GatewayStream,
   ROUTE_CATALOG,
   type RouteCatalog,
 } from "../../src/routing/gateway.types.js";
@@ -47,6 +48,27 @@ export class ScriptedRouter implements ChatRouter {
     this.script = [...script];
     this.received.length = 0;
     this.lastSignal = undefined;
+  }
+
+  private streamScript: (GatewayStream | GatewayError)[] = [];
+
+  replyStream(...script: (GatewayStream | GatewayError)[]): void {
+    this.streamScript = [...script];
+    this.received.length = 0;
+    this.lastSignal = undefined;
+  }
+
+  async stream(
+    request: GatewayRequest,
+    _caller: GatewayCaller,
+    signal: AbortSignal,
+  ): Promise<GatewayStream> {
+    this.received.push(request);
+    this.lastSignal = signal;
+    const next = this.streamScript.shift();
+    if (next === undefined) throw new Error("script de stream esgotado");
+    if (next instanceof GatewayError) throw next;
+    return next;
   }
 
   /** Sinal recebido na última chamada e quando `holdUntilAborted` está ligado, trava até ele abortar. */

@@ -1,5 +1,6 @@
 import type { GatewayResult, GatewayToolCall } from "../../routing/gateway.types.js";
 import { type OpenAiFinishReason, toFinishReason } from "./finish-reason.js";
+import { type OpenAiUsage, toOpenAiUsage } from "./usage.js";
 
 export interface ChatCompletionToolCall {
   id: string;
@@ -23,13 +24,7 @@ export interface ChatCompletion {
       finish_reason: OpenAiFinishReason;
     },
   ];
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-    prompt_tokens_details?: { cached_tokens: number };
-    completion_tokens_details?: { reasoning_tokens: number };
-  };
+  usage: OpenAiUsage;
 }
 
 export interface BuildChatCompletionInput {
@@ -63,18 +58,7 @@ export function buildChatCompletion({
         finish_reason: toFinishReason(result.finishReason),
       },
     ],
-    usage: {
-      prompt_tokens: result.usage.promptTokens,
-      completion_tokens: result.usage.completionTokens,
-      total_tokens: result.usage.totalTokens,
-      // SPEC-005: the details only appear when the provider reported them.
-      ...(result.usage.cachedPromptTokens !== undefined && {
-        prompt_tokens_details: { cached_tokens: result.usage.cachedPromptTokens },
-      }),
-      ...(result.usage.reasoningTokens !== undefined && {
-        completion_tokens_details: { reasoning_tokens: result.usage.reasoningTokens },
-      }),
-    },
+    usage: toOpenAiUsage(result.usage),
   };
 }
 

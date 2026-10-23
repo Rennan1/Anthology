@@ -1,4 +1,4 @@
-import type { ModelMessage, ToolChoice, ToolSet } from "ai";
+import type { ModelMessage, TextStreamPart, ToolChoice, ToolSet } from "ai";
 
 /** Id reservado: entrega a escolha da Rota ao orquestrador (SPEC-009). */
 export const AUTO_MODEL_ID = "auto";
@@ -88,6 +88,18 @@ export interface GatewayResult {
   readonly finishReasonRaw?: string;
 }
 
+/**
+ * Resposta em stream, já commitada (SPEC-003/006): `parts` continua o stream do provedor a partir
+ * da primeira parte. Erro depois do commit chega como parte `error`, nunca como exceção.
+ */
+export interface GatewayStream {
+  readonly route: string;
+  readonly routedBy: RoutedBy;
+  readonly modelKey: string;
+  readonly attempts: number;
+  readonly parts: AsyncIterable<TextStreamPart<ToolSet>>;
+}
+
 /** Porta do roteamento (SPEC-003/009); implementada no marco do roteamento. */
 export interface ChatRouter {
   complete(
@@ -95,6 +107,12 @@ export interface ChatRouter {
     caller: GatewayCaller,
     signal: AbortSignal,
   ): Promise<GatewayResult>;
+  /** Resolve no ponto de commit; antes dele, falha do candidato vai ao fallback ou propaga. */
+  stream(
+    request: GatewayRequest,
+    caller: GatewayCaller,
+    signal: AbortSignal,
+  ): Promise<GatewayStream>;
 }
 export const CHAT_ROUTER = Symbol("CHAT_ROUTER");
 

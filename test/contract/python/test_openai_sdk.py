@@ -61,3 +61,18 @@ def test_4_n_2_is_unsupported_parameter():
         client.chat.completions.create(model="code", messages=HELLO, n=2)
     assert info.value.code == "unsupported_parameter"
     assert info.value.param == "n"
+
+
+def test_5_streams_text_and_usage():
+    stream = client.chat.completions.create(
+        model="code",
+        messages=HELLO,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    chunks = list(stream)
+    text = "".join(c.choices[0].delta.content or "" for c in chunks if c.choices)
+    assert text == "Olá mundo"
+    assert chunks[-2].choices[0].finish_reason == "stop"
+    assert chunks[-1].choices == []
+    assert chunks[-1].usage.total_tokens == 15
