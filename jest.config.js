@@ -2,7 +2,7 @@
 const base = {
   preset: "ts-jest/presets/default-esm",
   extensionsToTreatAsEsm: [".ts"],
-  moduleNameMapper: { "^(.{1,2}/.*).js$": "$1" },
+  resolver: "<rootDir>/jest.resolver.cjs",
   transform: { "^.+.ts$": ["ts-jest", { useESM: true, tsconfig: "tsconfig.json" }] },
   testEnvironment: "node",
 };
