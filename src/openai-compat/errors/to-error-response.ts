@@ -32,32 +32,37 @@ function upstreamRejectedStatus(upstreamStatus: number | undefined): number {
   return isClientError ? upstreamStatus : ERROR_TABLE.upstream_rejected.status;
 }
 
-function bodyParserType(err: unknown): string | undefined {
-  if (typeof err !== "object" || err === null || !("type" in err)) return undefined;
-  return typeof err.type === "string" ? err.type : undefined;
+interface FrameworkStatus {
+  readonly status: number;
+  readonly fromNest: boolean;
 }
 
-function isClientErrorStatus(err: unknown): boolean {
-  if (typeof err !== "object" || err === null || !("status" in err)) return false;
-  return typeof err.status === "number" && err.status >= 400 && err.status < 500;
+// Só o status é confiável: o `type` do body-parser não chega ao filtro de forma estável.
+function frameworkStatus(err: unknown): FrameworkStatus | undefined {
+  if (err instanceof HttpException) return { status: err.getStatus(), fromNest: true };
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "status" in err &&
+    typeof err.status === "number"
+  ) {
+    return { status: err.status, fromNest: false };
+  }
+  return undefined;
 }
 
 // Mensagens fixas: err.message de terceiros (body-parser, Nest) pode ecoar o corpo do cliente.
 function fromFramework(err: unknown): ErrorResponse | undefined {
-  const parserType = bodyParserType(err);
-  const status = err instanceof HttpException ? err.getStatus() : undefined;
-  if (parserType === "entity.too.large" || status === 413) {
+  const framework = frameworkStatus(err);
+  if (framework === undefined) return undefined;
+  const { status, fromNest } = framework;
+  if (status === 413)
     return build("request_too_large", "Request body exceeds the size limit.", null);
-  }
-  if (parserType === "entity.parse.failed") {
-    return build("invalid_request", "Request body is not valid JSON.", null);
-  }
-  // Outro 4xx do body-parser (415 de charset/encoding...) ou 400 do Nest, sem linha própria na tabela.
-  if (status === 400 || (parserType !== undefined && isClientErrorStatus(err))) {
+  if (status === 404) return build("unknown_url", "Unknown request URL.", null);
+  // Demais 4xx do body-parser (415, corpo comprimido corrompido...) não têm linha própria na tabela.
+  // HttpException do Nest só é 400 quando é 400; os outros seguem para o 500 genérico.
+  if (status === 400 || (!fromNest && status >= 400 && status < 500)) {
     return build("invalid_request", "The request could not be understood.", null);
-  }
-  if (status === 404) {
-    return build("unknown_url", "Unknown request URL.", null);
   }
   return undefined;
 }

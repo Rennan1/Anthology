@@ -52,7 +52,10 @@ describe("toErrorResponse", () => {
   describe("body-parser and Nest errors", () => {
     it("maps entity.too.large to 413 request_too_large", () => {
       const res = toErrorResponse(
-        Object.assign(new Error("request entity too large"), { type: "entity.too.large" }),
+        Object.assign(new Error("request entity too large"), {
+          type: "entity.too.large",
+          status: 413,
+        }),
       );
       expect(res.status).toBe(413);
       expect(res.body.error).toMatchObject({
@@ -65,6 +68,7 @@ describe("toErrorResponse", () => {
       const res = toErrorResponse(
         Object.assign(new SyntaxError(`Unexpected token ${SECRET}`), {
           type: "entity.parse.failed",
+          status: 400,
         }),
       );
       expect(res.status).toBe(400);
@@ -90,6 +94,23 @@ describe("toErrorResponse", () => {
       expect(res.body.error.code).toBe("invalid_request");
       expect(res.body.error.message).not.toContain("JSON");
       expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
+    it("maps a 4xx body-parser error that carries only a status (corrupt br/gzip body) to 400", () => {
+      const err = Object.assign(new Error(SECRET), {
+        status: 400,
+        code: "ERR__ERROR_FORMAT_PADDING_2",
+      });
+      const res = toErrorResponse(err);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("invalid_request");
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
+    it("maps a 413 that carries only a status, whatever its type", () => {
+      const res = toErrorResponse(Object.assign(new Error("too big"), { status: 413 }));
+      expect(res.status).toBe(413);
+      expect(res.body.error.code).toBe("request_too_large");
     });
 
     it("does not call a non-body 400 (e.g. malformed URI) 'not valid JSON'", () => {
