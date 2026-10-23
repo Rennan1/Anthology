@@ -193,3 +193,28 @@ describe("rotas fecham quando nenhum guard identificou o chamador", () => {
     }
   });
 });
+
+describe("x-request-id também nos erros do body-parser", () => {
+  const post = (body: string) =>
+    fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${VALID_KEY}`,
+        "content-type": "application/json",
+        "x-request-id": "rid-1",
+      },
+      body,
+    });
+
+  it("JSON malformado → 400 com o id ecoado", async () => {
+    const res = await post("{bad");
+    expect(res.status).toBe(400);
+    expect(res.headers.get("x-request-id")).toBe("rid-1");
+  });
+
+  it("corpo acima do limite → 413 com o id ecoado", async () => {
+    const res = await post(JSON.stringify({ pad: "x".repeat(2 * 1024 * 1024) }));
+    expect(res.status).toBe(413);
+    expect(res.headers.get("x-request-id")).toBe("rid-1");
+  });
+});
