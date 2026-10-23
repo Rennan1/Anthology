@@ -1,0 +1,43 @@
+{
+  "name": "anthology",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gateway HTTP com API compatível com a OpenAI",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "deps": "depcruise src --config .dependency-cruiser.cjs",
+    "dup": "jscpd --config .jscpd.json",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects unit",
+    "test:contract": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects contract",
+    "setup:python": "python -m venv .venv && python -m pip --python .venv install -r test/contract/python/requirements.txt"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.2.0",
+    "@nestjs/core": "12.2.0",
+    "@nestjs/platform-express": "12.2.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.2",
+    "@nestjs/testing": "12.2.0",
+    "@types/express": "5.0.6",
+    "@types/jest": "30.0.0",
+    "@types/node": "24.19.2",
+    "@types/supertest": "7.2.1",
+    "dependency-cruiser": "18.7.0",
+    "jest": "30.5.2",
+    "jscpd": "5.4.2",
+    "openai": "7.43.0",
+    "supertest": "7.3.1",
+    "ts-jest": "29.4.15",
+    "typescript": "6.0.3"
+  }
+}
