@@ -5,6 +5,7 @@ export type GatewayErrorCode =
   | "unsupported_capability"
   | "invalid_api_key"
   | "model_not_found"
+  | "unknown_url"
   | "request_too_large"
   | "upstream_rate_limited"
   | "upstream_unavailable"

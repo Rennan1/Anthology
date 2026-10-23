@@ -47,6 +47,9 @@ function fromFramework(err: unknown): ErrorResponse | undefined {
   if (parserType === "entity.parse.failed" || status === 400) {
     return build("invalid_request", "Request body is not valid JSON.", null);
   }
+  if (status === 404) {
+    return build("unknown_url", "Unknown request URL.", null);
+  }
   return undefined;
 }
 
@@ -56,6 +59,6 @@ export function toErrorResponse(err: unknown): ErrorResponse {
       err.code === "upstream_rejected" ? upstreamRejectedStatus(err.upstreamStatus) : undefined;
     return build(err.code, err.message, err.param, status);
   }
-  // Qualquer outro erro (inclusive HttpException fora de 400/413, sem linha na tabela da SPEC) vira 500 genérico.
+  // Qualquer outro erro (inclusive HttpException fora de 400/404/413, sem linha na tabela da SPEC) vira 500 genérico.
   return fromFramework(err) ?? build("internal_error", GENERIC_INTERNAL_MESSAGE, null);
 }

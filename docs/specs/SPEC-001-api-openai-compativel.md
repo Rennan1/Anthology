@@ -133,6 +133,7 @@ O corpo segue o formato da OpenAI, que o SDK oficial `openai` já entende:
 | todos os candidatos falharam (outros retentáveis) | 502 | `api_error` | `upstream_unavailable` |
 | timeout em todos os candidatos | 504 | `api_error` | `upstream_timeout` |
 | erro não retentável do upstream (ex.: 400 de conteúdo) | status do upstream | `invalid_request_error` | `upstream_rejected` |
+| URL inexistente | 404 | `invalid_request_error` | `unknown_url` |
 | erro interno | 500 | `api_error` | `internal_error` |
 
 Rota não visível à chave devolve 404, não 403, para não revelar que ela existe.

@@ -244,3 +244,16 @@ describe("abort do cliente", () => {
     }
   });
 });
+
+describe("rota inexistente", () => {
+  it("→ 404 unknown_url no formato OpenAI, com x-request-id", async () => {
+    const res = await fetch(`${baseUrl}/v1/nao-existe`, {
+      headers: { authorization: `Bearer ${VALID_KEY}`, "x-request-id": "rid-404" },
+    });
+    expect(res.status).toBe(404);
+    expect(res.headers.get("x-request-id")).toBe("rid-404");
+    expect(await res.json()).toMatchObject({
+      error: { type: "invalid_request_error", code: "unknown_url" },
+    });
+  });
+});

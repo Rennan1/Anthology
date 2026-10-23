@@ -26,6 +26,7 @@ const ROWS: ReadonlyArray<[GatewayErrorCode, number, string, number | undefined]
   ["unsupported_capability", 400, "invalid_request_error", undefined],
   ["invalid_api_key", 401, "authentication_error", undefined],
   ["model_not_found", 404, "invalid_request_error", undefined],
+  ["unknown_url", 404, "invalid_request_error", undefined],
   ["request_too_large", 413, "invalid_request_error", undefined],
   ["upstream_rate_limited", 429, "rate_limit_error", undefined],
   ["upstream_unavailable", 502, "api_error", undefined],

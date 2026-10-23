@@ -13,6 +13,7 @@ export const ERROR_TABLE: Record<GatewayErrorCode, { status: number; type: Error
   unsupported_capability: { status: 400, type: "invalid_request_error" },
   invalid_api_key: { status: 401, type: "authentication_error" },
   model_not_found: { status: 404, type: "invalid_request_error" },
+  unknown_url: { status: 404, type: "invalid_request_error" },
   request_too_large: { status: 413, type: "invalid_request_error" },
   upstream_rate_limited: { status: 429, type: "rate_limit_error" },
   upstream_unavailable: { status: 502, type: "api_error" },

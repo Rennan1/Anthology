@@ -11,6 +11,7 @@ const TABLE: ReadonlyArray<[GatewayErrorCode, number, string]> = [
   ["unsupported_capability", 400, "invalid_request_error"],
   ["invalid_api_key", 401, "authentication_error"],
   ["model_not_found", 404, "invalid_request_error"],
+  ["unknown_url", 404, "invalid_request_error"],
   ["request_too_large", 413, "invalid_request_error"],
   ["upstream_rate_limited", 429, "rate_limit_error"],
   ["upstream_unavailable", 502, "api_error"],
@@ -80,6 +81,13 @@ describe("toErrorResponse", () => {
       expect(toErrorResponse(new HttpException("x", 413)).body.error.code).toBe(
         "request_too_large",
       );
+    });
+
+    it("maps HttpException 404 (rota inexistente) to unknown_url without leaking the path", () => {
+      const res = toErrorResponse(new HttpException(`Cannot GET /v1/${SECRET}`, 404));
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe("unknown_url");
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
     });
 
     it("maps other HttpException statuses to 500 internal_error without leaking the message", () => {
