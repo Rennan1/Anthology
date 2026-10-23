@@ -215,6 +215,20 @@ Além do schema, o loader verifica:
    variável, nunca um valor.
 5. Mutar o `GatewayConfig` em tempo de execução lança erro (o objeto está congelado).
 
+## Notas de implementação
+
+- O schema é **estrito**: campo desconhecido no arquivo é erro (typo em `fallbacks` não passa em
+  silêncio). A única exceção é `$schema`.
+- Erros de schema (tipo, faixa, campo desconhecido) são reportados juntos, e as validações de
+  integridade e de `*Env` só rodam sobre um arquivo que passou no schema. Todas as de integridade e
+  de `*Env` são reportadas juntas.
+- `loadConfig` recebe a lista de tipos de provedor com fábrica registrada
+  ([SPEC-004](SPEC-004-camada-de-provedores.md)); o `ConfigModule.forRoot` a recebe do app.
+- O `GatewayConfig` guarda o valor resolvido de cada `*Env` (`providers.<id>.apiKey`,
+  `auth.keys[].key`) ao lado do nome. O redator de log da SPEC-008 cobre campos `*key*`.
+- O JSON Schema gerado fica em `anthology.config.schema.json`; `npm run schema:generate` o regera, e
+  um teste unitário falha se ele divergir do schema zod.
+
 ## Fora de escopo (v1)
 
 Hot reload, configuração vinda de banco ou API, múltiplos arquivos, herança entre Rotas.

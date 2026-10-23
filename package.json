@@ -15,7 +15,8 @@
     "dup": "jscpd --config .jscpd.json",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects unit",
     "test:contract": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects contract",
-    "setup:python": "python -m venv .venv && python -m pip --python .venv install -r test/contract/python/requirements.txt"
+    "setup:python": "python -m venv .venv && python -m pip --python .venv install -r test/contract/python/requirements.txt",
+    "schema:generate": "npm run build && node scripts/generate-config-schema.mjs"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
