@@ -5,7 +5,7 @@ import type { SkippedCandidate } from "./route-plan.js";
 
 export interface AttemptRecord {
   readonly model: string;
-  readonly outcome: "ok" | "error" | "client_aborted";
+  readonly outcome: "ok" | "error" | "client_aborted" | "stream_error";
   readonly status?: number;
   readonly kind?: FailureKind;
   readonly latencyMs: number;

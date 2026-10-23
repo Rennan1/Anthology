@@ -15,7 +15,7 @@ export type ResultParts = Pick<
   "text" | "toolCalls" | "finishReason" | "usage" | "usageMissing" | "finishReasonRaw"
 >;
 
-function toFinishReason(reason: FinishReason): GatewayFinishReason {
+export function toGatewayFinishReason(reason: FinishReason): GatewayFinishReason {
   // `interrupted` (AI SDK 7: stream ended without a completion signal) has no OpenAI counterpart.
   return reason === "interrupted" ? "other" : reason;
 }
@@ -23,7 +23,7 @@ function toFinishReason(reason: FinishReason): GatewayFinishReason {
 // The mapping to the OpenAI vocabulary loses the original here, so the log keeps it (SPEC-005).
 const LOSSY_FINISH_REASONS: readonly FinishReason[] = ["error", "other", "interrupted"];
 
-function toUsage(usage: LanguageModelUsage): GatewayResult["usage"] {
+export function toGatewayUsage(usage: LanguageModelUsage): GatewayResult["usage"] {
   const promptTokens = usage.inputTokens ?? 0;
   const completionTokens = usage.outputTokens ?? 0;
   const cached = usage.inputTokenDetails.cacheReadTokens;
@@ -47,8 +47,8 @@ export function toResultParts(output: GenerationOutput): ResultParts {
       name: call.toolName,
       input: call.input,
     })),
-    finishReason: toFinishReason(output.finishReason),
-    usage: toUsage(output.usage),
+    finishReason: toGatewayFinishReason(output.finishReason),
+    usage: toGatewayUsage(output.usage),
     ...(usageMissing && { usageMissing: true as const }),
     ...(LOSSY_FINISH_REASONS.includes(output.finishReason) &&
       output.rawFinishReason !== undefined && { finishReasonRaw: output.rawFinishReason }),

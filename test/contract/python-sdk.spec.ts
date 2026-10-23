@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { replay, streamOf, textParts } from "../support/stream-parts.js";
 import { result, router, startGateway } from "./harness.js";
 
 const PYTHON = join(
@@ -38,7 +39,7 @@ function runPytest(): Promise<{ code: number | null; output: string }> {
   });
 }
 
-describe("SPEC-001 critério 2: SDK openai de Python (sem stream)", () => {
+describe("SPEC-001 critério 2 e SPEC-006: SDK openai de Python", () => {
   it("passa o cenário de contrato em Python", async () => {
     // Sem o venv o critério não foi provado: falha alto em vez de pular (npm run setup:python).
     expect(existsSync(PYTHON)).toBe(true);
@@ -51,8 +52,9 @@ describe("SPEC-001 critério 2: SDK openai de Python (sem stream)", () => {
       }),
       result({ text: "28 graus" }),
     );
+    router.replyStream(streamOf(replay(textParts("Olá", " mundo"))));
     const run = await runPytest();
-    expect(run.output).toContain("4 passed");
+    expect(run.output).toContain("5 passed");
     expect(run.code).toBe(0);
   });
 });

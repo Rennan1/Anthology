@@ -108,12 +108,6 @@ describe("SPEC-001 critério 4: parâmetros", () => {
     });
     expect({ ...extra, id: "", created: 0 }).toEqual({ ...plain, id: "", created: 0 });
   });
-
-  it("stream: true é recusado até a SPEC-006", async () => {
-    await expect(
-      client.chat.completions.create({ model: "code", messages: hello, stream: true }),
-    ).rejects.toMatchObject({ status: 400, code: "unsupported_parameter", param: "stream" });
-  });
 });
 
 describe("SPEC-001 critério 5: fallback", () => {
