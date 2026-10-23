@@ -110,6 +110,26 @@ Mock prova a tradução e o roteamento, **não** o provedor. Só o smoke test re
 6. Uma fábrica `openai-compatible` de exemplo, escrita só para o teste, entra sem nenhum diff fora
    de `src/providers/` e do registro no módulo.
 
+## Notas de implementação
+
+Confirmadas contra `ai@7.0.150` e `@openrouter/ai-sdk-provider@3.1.0` instalados:
+
+- `AiSdkProvider` é derivado de `Parameters<typeof createProviderRegistry>[0][string]`
+  (`ProviderV3 | ProviderV4` na v7), em `provider-factory.ts` e em nenhum outro lugar.
+- O registry divide o id `<provider>:<modelId>` no **primeiro** `:`, então um `modelId` do
+  OpenRouter com `:` (ex.: `...:free`) funciona; já o id do provedor não pode ter `:` (SPEC-002).
+- O pacote do OpenRouter lê `providerOptions.openrouter`, e a fábrica o cria com
+  `compatibility: "strict"`, como o pacote pede para a API real (`compatible` omite
+  `stream_options`, de que o chunk de `usage` da SPEC-006 depende).
+- `ProvidersModule.forRoot({ factories })` recebe a lista de fábricas; `providerFactories()` é o
+  registro (hoje só o OpenRouter). A mesma lista alimenta `ConfigModule.forRoot({ providerTypes })`.
+- A fábrica `mock` mora em `test/support/` e entra por `forRoot`; em produção ninguém a registra, e
+  `type: "mock"` é rejeitado no boot (SPEC-002, validação 2). O critério 6 é provado com uma fábrica
+  de teste sobre `customProvider`, sem o pacote `@ai-sdk/openai-compatible`.
+- `npm run test:smoke` roda completion, stream e um tool call contra o OpenRouter. Sem
+  `OPENROUTER_API_KEY` sai com código 3 e a linha `nao_verificado`.
+- `anthology.config.example.json` e `.env.example` já trazem o OpenRouter como provedor oficial.
+
 ## Fora de escopo (v1)
 
 Provedores oficiais além do OpenRouter; provedores de embedding; descoberta dinâmica de modelos

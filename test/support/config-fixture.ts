@@ -12,9 +12,12 @@ export const TEST_ENV = {
 };
 
 /** The committed example with `maxRetries: 0` (the AI SDK would otherwise sleep 2 s between retries). */
-export function testConfig(change?: (config: ConfigJson) => void): GatewayConfig {
+export function testConfig(
+  change?: (config: ConfigJson) => void,
+  providerTypes: readonly string[] = ["openrouter"],
+): GatewayConfig {
   const raw: ConfigJson = JSON.parse(readFileSync("anthology.config.example.json", "utf8"));
   for (const model of Object.values<ConfigJson>(raw.models)) model.maxRetries = 0;
   change?.(raw);
-  return parseConfig(raw, { env: TEST_ENV, providerTypes: ["openrouter"] });
+  return parseConfig(raw, { env: TEST_ENV, providerTypes });
 }

@@ -16,12 +16,14 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects unit",
     "test:contract": "node --experimental-vm-modules node_modules/jest/bin/jest.js --selectProjects contract",
     "setup:python": "python -m venv .venv && python -m pip --python .venv install -r test/contract/python/requirements.txt",
-    "schema:generate": "npm run build && node scripts/generate-config-schema.mjs"
+    "schema:generate": "npm run build && node scripts/generate-config-schema.mjs",
+    "test:smoke": "npm run build && node test/smoke/openrouter.smoke.mjs"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-express": "12.2.0",
+    "@openrouter/ai-sdk-provider": "3.1.0",
     "ai": "7.0.150",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
