@@ -142,6 +142,30 @@ Com provedor mock que responde por roteiro:
 11. `model: "auto"` com o orquestrador escolhendo `code`, e o `target` de `code` respondendo 429
     → o fallback de `code` atende. A escolha da Rota e o fallback dentro dela são independentes.
 
+## Notas de implementação
+
+Confirmadas contra o `ai@7.0.150` instalado (`.d.ts` e fontes em `node_modules/ai`):
+
+- O teto de tokens e as sequências de parada se chamam `maxOutputTokens` e `stopSequences` (o
+  `stop` da requisição é renomeado no merge). O teto do modelo **limita** um valor pedido; não cria
+  um valor quando ninguém pediu.
+- O padrão de `generateText` é passo único (`stopWhen: isStepCount(1)`) e `maxRetries` padrão 2; o
+  gateway sempre passa o `maxRetries` do candidato.
+- Esgotados os retries, o SDK lança `RetryError`; a classificação olha o `lastError`.
+- O `finishReason` do SDK ganhou `interrupted` (fim do stream sem sinal de conclusão). Ele vira
+  `other` e, portanto, `stop` na resposta.
+- O timeout do candidato é um `AbortSignal.timeout(timeoutMs)` combinado com o sinal do cliente
+  (`AbortSignal.any`). Quem aborta é conhecido (o gateway é dono dos dois sinais), então "timeout do
+  candidato" e "abort do cliente" nunca se confundem.
+- Erro sem status só é rede quando o SDK o marca `isRetryable` ou o `cause.code` é de rede
+  (`ECONNREFUSED`, `ECONNRESET`, `ENOTFOUND`, `EAI_AGAIN`, `ETIMEDOUT`…). 5xx fora da lista
+  retentável (ex.: 501) não vai ao próximo candidato e volta como 502 `upstream_unavailable`.
+- `model: "auto"`: a continuação, a opção única e a `defaultRoute` já funcionam; a escolha pelo
+  modelo orquestrador entra com a [SPEC-009](SPEC-009-orquestrador.md). Até lá, `auto` sem
+  continuação com mais de uma Rota elegível cai na `defaultRoute` (`routed-by: default`).
+- Os critérios 6 e 7 (ponto de commit em streaming) e o `maxRetries` em stream pertencem à
+  [SPEC-006](SPEC-006-streaming-sse.md) e são cobertos lá.
+
 ## Fora de escopo (v1)
 
 Balanceamento por peso entre modelos; circuit breaker com estado

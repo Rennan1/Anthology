@@ -22,3 +22,6 @@ export function deepFreeze<T>(value: T): T {
   }
   return value;
 }
+
+export type ModelConfig = GatewayConfig["models"][string];
+export type RouteConfig = GatewayConfig["routes"][string];

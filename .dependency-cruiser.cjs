@@ -28,7 +28,8 @@ module.exports = {
     {
       name: "ai-sdk-confinado",
       severity: "error",
-      from: { pathNot: "^src/(providers|routing|openai-compat/translate)/" },
+      // test/support needs `ai/test` (the mock model) and builds AI SDK results; it is not shipped.
+      from: { pathNot: "^(src/(providers|routing|openai-compat/translate)/|test/support/)" },
       to: { path: "^node_modules/ai/" },
     },
     { name: "sem-ciclos", severity: "error", from: {}, to: { circular: true } },
