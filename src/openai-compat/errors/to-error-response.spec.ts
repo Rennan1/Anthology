@@ -83,6 +83,22 @@ describe("toErrorResponse", () => {
       );
     });
 
+    it("maps body-parser 4xx without a table row (415, bad charset/encoding) to a 400 that says so", () => {
+      const err = Object.assign(new Error(SECRET), { type: "charset.unsupported", status: 415 });
+      const res = toErrorResponse(err);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("invalid_request");
+      expect(res.body.error.message).not.toContain("JSON");
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
+    it("does not call a non-body 400 (e.g. malformed URI) 'not valid JSON'", () => {
+      const res = toErrorResponse(new HttpException(SECRET, 400));
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).not.toContain("JSON");
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
     it("maps HttpException 404 (rota inexistente) to unknown_url without leaking the path", () => {
       const res = toErrorResponse(new HttpException(`Cannot GET /v1/${SECRET}`, 404));
       expect(res.status).toBe(404);

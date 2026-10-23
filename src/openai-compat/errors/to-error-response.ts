@@ -37,6 +37,11 @@ function bodyParserType(err: unknown): string | undefined {
   return typeof err.type === "string" ? err.type : undefined;
 }
 
+function isClientErrorStatus(err: unknown): boolean {
+  if (typeof err !== "object" || err === null || !("status" in err)) return false;
+  return typeof err.status === "number" && err.status >= 400 && err.status < 500;
+}
+
 // Mensagens fixas: err.message de terceiros (body-parser, Nest) pode ecoar o corpo do cliente.
 function fromFramework(err: unknown): ErrorResponse | undefined {
   const parserType = bodyParserType(err);
@@ -44,8 +49,12 @@ function fromFramework(err: unknown): ErrorResponse | undefined {
   if (parserType === "entity.too.large" || status === 413) {
     return build("request_too_large", "Request body exceeds the size limit.", null);
   }
-  if (parserType === "entity.parse.failed" || status === 400) {
+  if (parserType === "entity.parse.failed") {
     return build("invalid_request", "Request body is not valid JSON.", null);
+  }
+  // Outro 4xx do body-parser (415 de charset/encoding...) ou 400 do Nest, sem linha própria na tabela.
+  if (status === 400 || (parserType !== undefined && isClientErrorStatus(err))) {
+    return build("invalid_request", "The request could not be understood.", null);
   }
   if (status === 404) {
     return build("unknown_url", "Unknown request URL.", null);
