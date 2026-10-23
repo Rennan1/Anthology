@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { generateText, type ModelMessage, type ToolChoice, type ToolSet } from "ai";
+import { generateText } from "ai";
 import { GATEWAY_CONFIG } from "../config/config.module.js";
 import type { GatewayConfig } from "../config/gateway-config.js";
 import { MODEL_CATALOG, type ModelCatalog } from "../providers/model-catalog.js";
@@ -14,16 +14,17 @@ import type {
 } from "./gateway.types.js";
 import { GatewayError } from "./gateway-error.js";
 import { mergeParams } from "./merge-params.js";
+import { buildProviderOptions } from "./provider-options.js";
+import { rawJsonOutput } from "./raw-json-output.js";
 import { type PlannedCandidate, planRoute, type RoutePlan, visibleRouteIds } from "./route-plan.js";
 import { type AttemptRecord, ROUTING_RECORDER, type RoutingRecorder } from "./routing-recorder.js";
 import { type ResultParts, toResultParts } from "./to-gateway-result.js";
 
-type ProviderOptions = NonNullable<Parameters<typeof generateText>[0]["providerOptions"]>;
-
-type AttemptOutcome =
-  | { type: "ok"; parts: ResultParts; record: AttemptRecord }
-  | { type: "failed"; failure: Failure; record: AttemptRecord }
-  | { type: "aborted"; record: AttemptRecord };
+type AttemptOutcome = { ignoredParams: readonly string[]; record: AttemptRecord } & (
+  | { type: "ok"; parts: ResultParts }
+  | { type: "failed"; failure: Failure }
+  | { type: "aborted" }
+);
 
 @Injectable()
 export class RoutingService implements ChatRouter, RouteCatalog {
@@ -46,11 +47,17 @@ export class RoutingService implements ChatRouter, RouteCatalog {
     const plan = planRoute({ request, caller, config: this.config, catalog: this.catalog });
     const attempts: AttemptRecord[] = [];
     const failures: Failure[] = [];
+    const ignoredParams = new Set<string>();
+    let served: ResultParts | undefined;
     try {
       for (const candidate of plan.candidates) {
         const outcome = await this.attempt(candidate, plan, request, signal);
         attempts.push(outcome.record);
-        if (outcome.type === "ok") return this.result(plan, candidate, outcome.parts, attempts);
+        for (const param of outcome.ignoredParams) ignoredParams.add(param);
+        if (outcome.type === "ok") {
+          served = outcome.parts;
+          return this.result(plan, candidate, outcome.parts, attempts);
+        }
         if (outcome.type === "aborted") {
           throw new GatewayError("upstream_unavailable", "The request was aborted by the client.");
         }
@@ -64,6 +71,9 @@ export class RoutingService implements ChatRouter, RouteCatalog {
         routedBy: plan.routedBy,
         attempts,
         skipped: plan.skipped,
+        ...(ignoredParams.size > 0 && { ignoredParams: [...ignoredParams] }),
+        ...(served?.usageMissing && { usageMissing: true as const }),
+        ...(served?.finishReasonRaw !== undefined && { finishReasonRaw: served.finishReasonRaw }),
       });
     }
   }
@@ -89,29 +99,32 @@ export class RoutingService implements ChatRouter, RouteCatalog {
     request: GatewayRequest,
     clientSignal: AbortSignal,
   ): Promise<AttemptOutcome> {
-    const { languageModel, config, optionsNamespace } = candidate.model;
+    const { languageModel, config } = candidate.model;
+    const { options: providerOptions, ignoredParams } = buildProviderOptions(
+      candidate.model,
+      request.parallelToolCalls,
+    );
     const started = performance.now();
     const latency = () => Math.round(performance.now() - started);
     const timeout = AbortSignal.timeout(config.timeoutMs);
     try {
       const output = await generateText({
         model: languageModel,
-        // SPEC-005 narrows these from `unknown` to the AI SDK types when it translates the request.
-        messages: request.messages as ModelMessage[],
-        ...(request.tools !== undefined && { tools: request.tools as unknown as ToolSet }),
-        ...(request.toolChoice !== undefined && {
-          toolChoice: request.toolChoice as ToolChoice<ToolSet>,
+        messages: [...request.messages],
+        ...(request.tools !== undefined && { tools: request.tools }),
+        ...(request.toolChoice !== undefined && { toolChoice: request.toolChoice }),
+        ...(request.responseFormat !== undefined && {
+          output: rawJsonOutput(request.responseFormat),
         }),
         ...mergeParams({ model: config, route: plan.route, request: request.params }),
         maxRetries: config.maxRetries,
         abortSignal: AbortSignal.any([clientSignal, timeout]),
-        ...(config.providerOptions !== undefined && {
-          providerOptions: { [optionsNamespace]: config.providerOptions } as ProviderOptions,
-        }),
+        ...(providerOptions !== undefined && { providerOptions }),
       });
       return {
         type: "ok",
         parts: toResultParts(output),
+        ignoredParams,
         record: { model: candidate.modelKey, outcome: "ok", latencyMs: latency() },
       };
     } catch (error) {
@@ -121,7 +134,7 @@ export class RoutingService implements ChatRouter, RouteCatalog {
           outcome: "client_aborted",
           latencyMs: latency(),
         };
-        return { type: "aborted", record };
+        return { type: "aborted", ignoredParams, record };
       }
       const failure = classifyFailure(error, { timedOut: timeout.aborted });
       const record: AttemptRecord = {
@@ -131,7 +144,7 @@ export class RoutingService implements ChatRouter, RouteCatalog {
         kind: failure.kind,
         latencyMs: latency(),
       };
-      return { type: "failed", failure, record };
+      return { type: "failed", failure, ignoredParams, record };
     }
   }
 }

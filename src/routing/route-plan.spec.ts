@@ -1,5 +1,7 @@
+import type { ModelMessage } from "ai";
 import { mockCatalog } from "../../test/support/catalog.js";
 import { testConfig } from "../../test/support/config-fixture.js";
+import { imageMessage, weatherTools } from "../../test/support/requests.js";
 import { scriptedModel } from "../../test/support/scripted-model.js";
 import type { GatewayRequest } from "./gateway.types.js";
 import { GatewayError } from "./gateway-error.js";
@@ -17,7 +19,7 @@ const chatbot = { keyId: "app-chatbot" };
 const request = (overrides: Partial<GatewayRequest> = {}): GatewayRequest => ({
   model: "code",
   continuationRoute: undefined,
-  messages: [{ role: "user", content: "oi" }],
+  messages: [{ role: "user", content: [{ type: "text", text: "oi" }] }],
   params: {},
   tools: undefined,
   toolChoice: undefined,
@@ -39,6 +41,13 @@ function errorOf(run: () => unknown): GatewayError {
 
 const plan = (req: GatewayRequest, caller = backoffice, cfg = config) =>
   planRoute({ request: req, caller, config: cfg, catalog });
+
+const toolResult: ModelMessage = {
+  role: "tool",
+  content: [
+    { type: "tool-result", toolCallId: "c1", toolName: "f", output: { type: "text", value: "ok" } },
+  ],
+};
 
 describe("visibleRouteIds", () => {
   it("lists every route for a wildcard key, in config order", () => {
@@ -81,11 +90,7 @@ describe("planRoute: explicit route", () => {
       c.models.sonnet.capabilities = ["vision"];
     });
 
-    const planned = plan(
-      request({ model: "code", tools: [{ type: "function" }] }),
-      backoffice,
-      cfg,
-    );
+    const planned = plan(request({ model: "code", tools: weatherTools }), backoffice, cfg);
 
     expect(planned.candidates.map((c) => c.modelKey)).toEqual(["mini"]);
     expect(planned.skipped).toEqual([
@@ -94,14 +99,12 @@ describe("planRoute: explicit route", () => {
   });
 
   it("answers 400 unsupported_capability when no candidate has the capability (criterion 5)", () => {
-    const image = { role: "user", content: [{ type: "image", image: "x" }] };
-
     const cfg = testConfig((c) => {
       c.models.flash.capabilities = ["tools", "json_schema"];
     });
 
     const err = errorOf(() =>
-      plan(request({ model: "general", messages: [image] }), backoffice, cfg),
+      plan(request({ model: "general", messages: [imageMessage] }), backoffice, cfg),
     );
 
     expect(err.code).toBe("unsupported_capability");
@@ -130,10 +133,7 @@ describe("planRoute: model auto", () => {
   });
 
   it("reuses the continuation route when the last message is a tool result", () => {
-    const messages = [
-      { role: "user", content: "oi" },
-      { role: "tool", content: "ok" },
-    ];
+    const messages: ModelMessage[] = [{ role: "user", content: "oi" }, toolResult];
 
     const planned = plan(auto({ messages, continuationRoute: "code" }));
 
@@ -141,7 +141,7 @@ describe("planRoute: model auto", () => {
   });
 
   it("ignores a continuation route the key may not use (negative control)", () => {
-    const messages = [{ role: "tool", content: "ok" }];
+    const messages = [toolResult];
 
     const planned = plan(auto({ messages, continuationRoute: "code" }), chatbot);
 
@@ -162,7 +162,7 @@ describe("planRoute: model auto", () => {
       }
     });
 
-    const err = errorOf(() => plan(auto({ tools: [{ type: "function" }] }), backoffice, cfg));
+    const err = errorOf(() => plan(auto({ tools: weatherTools }), backoffice, cfg));
 
     expect(err.code).toBe("unsupported_capability");
   });
@@ -172,9 +172,8 @@ describe("planRoute: model auto", () => {
       c.models.mini.capabilities = ["json_schema"];
       c.models.flash.capabilities = ["json_schema"];
     });
-    const image = { role: "user", content: [{ type: "image", image: "x" }] };
 
-    const planned = plan(auto({ messages: [image] }), backoffice, cfg);
+    const planned = plan(auto({ messages: [imageMessage] }), backoffice, cfg);
 
     expect(planned).toMatchObject({ routeId: "code", routedBy: "single_option" });
   });

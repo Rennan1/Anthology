@@ -28,6 +28,9 @@ export interface ProviderFactory<Options = unknown> {
   readonly optionsNamespace: string;
   /** Valida `providers.<id>.options`; roda no boot, junto da SPEC-002. */
   readonly optionsSchema: ZodType<Options>;
+  /** Chave, dentro de `providerOptions[optionsNamespace]`, que leva `parallel_tool_calls`
+   *  (SPEC-005). Ausente quando o provedor não tem essa chave: o parâmetro é então ignorado. */
+  readonly parallelToolCallsOption?: string;
   /** Cria o provider do AI SDK. `apiKey` já vem resolvida do ambiente. */
   create(input: { apiKey: string; baseURL?: string; headers?: Record<string, string>; options: Options }): AiSdkProvider;
 }

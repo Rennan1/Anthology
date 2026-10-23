@@ -6,6 +6,8 @@ import type { ProviderFactory } from "../provider-factory.js";
 export const openRouterFactory: ProviderFactory<Record<string, never>> = {
   type: "openrouter",
   optionsNamespace: "openrouter",
+  // The package spreads providerOptions.openrouter into the request body, so this is the body field.
+  parallelToolCallsOption: "parallel_tool_calls",
   optionsSchema: z.strictObject({}),
   create: ({ apiKey, baseURL, headers }) =>
     createOpenRouter({

@@ -23,7 +23,13 @@ export interface ChatCompletion {
       finish_reason: OpenAiFinishReason;
     },
   ];
-  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    prompt_tokens_details?: { cached_tokens: number };
+    completion_tokens_details?: { reasoning_tokens: number };
+  };
 }
 
 export interface BuildChatCompletionInput {
@@ -61,6 +67,13 @@ export function buildChatCompletion({
       prompt_tokens: result.usage.promptTokens,
       completion_tokens: result.usage.completionTokens,
       total_tokens: result.usage.totalTokens,
+      // SPEC-005: the details only appear when the provider reported them.
+      ...(result.usage.cachedPromptTokens !== undefined && {
+        prompt_tokens_details: { cached_tokens: result.usage.cachedPromptTokens },
+      }),
+      ...(result.usage.reasoningTokens !== undefined && {
+        completion_tokens_details: { reasoning_tokens: result.usage.reasoningTokens },
+      }),
     },
   };
 }

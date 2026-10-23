@@ -49,6 +49,28 @@ describe("buildChatCompletion", () => {
     expect([completion.id, completion.created]).toEqual(["chatcmpl-xyz", 42]);
   });
 
+  it("adds cached and reasoning token details only when the provider reported them", () => {
+    const detailed = build({
+      usage: {
+        promptTokens: 100,
+        completionTokens: 30,
+        totalTokens: 130,
+        cachedPromptTokens: 40,
+        reasoningTokens: 10,
+      },
+    });
+
+    expect(detailed.usage).toEqual({
+      prompt_tokens: 100,
+      completion_tokens: 30,
+      total_tokens: 130,
+      prompt_tokens_details: { cached_tokens: 40 },
+      completion_tokens_details: { reasoning_tokens: 10 },
+    });
+    expect("prompt_tokens_details" in build().usage).toBe(false);
+    expect("completion_tokens_details" in build().usage).toBe(false);
+  });
+
   it("omits tool_calls when empty", () => {
     expect("tool_calls" in build().choices[0].message).toBe(false);
   });

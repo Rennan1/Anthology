@@ -6,6 +6,8 @@ export interface CatalogModel {
   readonly config: ModelConfig;
   /** Key of this provider's options in the AI SDK `providerOptions` (SPEC-004). */
   readonly optionsNamespace: string;
+  /** Where this provider takes `parallel_tool_calls` in `providerOptions`; absent = unsupported. */
+  readonly parallelToolCallsOption?: string;
 }
 
 /** What routing sees of the provider layer: it never touches the registry or a factory. */

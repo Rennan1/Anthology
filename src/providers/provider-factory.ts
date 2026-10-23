@@ -12,6 +12,11 @@ export interface ProviderFactory<Options = unknown> {
   readonly type: string;
   /** Key the AI SDK reads in `providerOptions` (e.g. "openrouter"). */
   readonly optionsNamespace: string;
+  /**
+   * Key, inside `providerOptions[optionsNamespace]`, that carries `parallel_tool_calls`
+   * (SPEC-005). Absent when the provider has no such switch: the parameter is then ignored.
+   */
+  readonly parallelToolCallsOption?: string;
   /** Validates `providers.<id>.options`; runs at boot, with SPEC-002. */
   readonly optionsSchema: ZodType<Options>;
   /** Builds the AI SDK provider. `apiKey` already comes resolved from the environment. */

@@ -1,27 +1,24 @@
 import type { Capability } from "../config/capabilities.js";
 import type { GatewayRequest } from "./gateway.types.js";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasImagePart(messages: readonly unknown[]): boolean {
+function hasImagePart(messages: GatewayRequest["messages"]): boolean {
   return messages.some(
     (message) =>
-      isRecord(message) &&
-      Array.isArray(message.content) &&
-      message.content.some((part) => isRecord(part) && part.type === "image"),
+      message.role === "user" &&
+      typeof message.content !== "string" &&
+      message.content.some(
+        (part) =>
+          part.type === "image" || (part.type === "file" && part.mediaType.startsWith("image/")),
+      ),
   );
 }
 
 /** SPEC-003: what the request demands of a candidate, in a stable order. */
 export function requiredCapabilities(request: GatewayRequest): Capability[] {
   const required: Capability[] = [];
-  if (request.tools !== undefined && request.tools.length > 0) required.push("tools");
+  if (request.tools !== undefined && Object.keys(request.tools).length > 0) required.push("tools");
   if (hasImagePart(request.messages)) required.push("vision");
-  if (isRecord(request.responseFormat) && request.responseFormat.type === "json_schema") {
-    required.push("json_schema");
-  }
+  if (request.responseFormat?.type === "json_schema") required.push("json_schema");
   return required;
 }
 

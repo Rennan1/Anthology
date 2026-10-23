@@ -1,13 +1,14 @@
 import { createProviderRegistry } from "ai";
+import { formatJsonPath } from "../common/json-path.js";
 import { ConfigError, type ConfigIssue } from "../config/config-error.js";
 import type { GatewayConfig } from "../config/gateway-config.js";
-import { formatJsonPath } from "../config/json-path.js";
 import type { CatalogModel, ModelCatalog } from "./model-catalog.js";
 import type { AiSdkProvider, ProviderFactory } from "./provider-factory.js";
 
 interface BuiltProvider {
   readonly provider: AiSdkProvider;
   readonly optionsNamespace: string;
+  readonly parallelToolCallsOption: string | undefined;
 }
 
 function buildProviders(
@@ -42,7 +43,11 @@ function buildProviders(
       ...(entry.headers !== undefined && { headers: entry.headers }),
       options: options.data,
     });
-    built.set(id, { provider, optionsNamespace: factory.optionsNamespace });
+    built.set(id, {
+      provider,
+      optionsNamespace: factory.optionsNamespace,
+      parallelToolCallsOption: factory.parallelToolCallsOption,
+    });
   }
   return built;
 }
@@ -73,6 +78,9 @@ export function buildModelCatalog(
         languageModel,
         config: model,
         optionsNamespace: built.optionsNamespace,
+        ...(built.parallelToolCallsOption !== undefined && {
+          parallelToolCallsOption: built.parallelToolCallsOption,
+        }),
       });
     } catch {
       issues.push({

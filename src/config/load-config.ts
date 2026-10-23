@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
+import { formatJsonPath } from "../common/json-path.js";
 import { ConfigError, type ConfigIssue } from "./config-error.js";
 import { checkIntegrity } from "./config-integrity.js";
 import { type ConfigFile, ConfigFileSchema } from "./config-schema.js";
 import { deepFreeze, type GatewayConfig } from "./gateway-config.js";
-import { formatJsonPath } from "./json-path.js";
 
 export interface ParseConfigOptions {
   readonly env: NodeJS.ProcessEnv;

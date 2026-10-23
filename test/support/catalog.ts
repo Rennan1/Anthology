@@ -6,6 +6,7 @@ import type { ModelCatalog } from "../../src/providers/model-catalog.js";
 export function mockCatalog(
   config: GatewayConfig,
   models: Record<string, MockLanguageModelV4>,
+  options: { parallelToolCallsOption?: string } = {},
 ): ModelCatalog {
   return {
     get(modelKey) {
@@ -14,7 +15,14 @@ export function mockCatalog(
       if (languageModel === undefined || modelConfig === undefined) {
         throw new Error(`mockCatalog: no mock for model '${modelKey}'`);
       }
-      return { languageModel, config: modelConfig, optionsNamespace: "openrouter" };
+      return {
+        languageModel,
+        config: modelConfig,
+        optionsNamespace: "openrouter",
+        ...(options.parallelToolCallsOption !== undefined && {
+          parallelToolCallsOption: options.parallelToolCallsOption,
+        }),
+      };
     },
   };
 }
